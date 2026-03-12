@@ -260,6 +260,9 @@
   .sync-toggle.on { color: var(--accent); }
   .sync-toggle.on .sync-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 
+  .sync-toggle.b-mode { color: #7bd9ff; }
+  .sync-toggle.b-mode .sync-dot { background: #7bd9ff; box-shadow: 0 0 6px #7bd9ff; }
+
   .btn-row {
     display: flex;
     align-items: center;
@@ -380,7 +383,7 @@
     <span class="time-label" id="time-dur">0:00</span>
     <div class="sync-toggle on" id="sync-toggle" onclick="toggleSync()">
       <div class="sync-dot"></div>
-      SYNC
+      <span id="sync-label">EDIT A</span>
     </div>
   </div>
 
@@ -405,7 +408,7 @@
       <option value="2">2x</option>
     </select>
   </div>
-  <div class="frame-info">◀▶ フレーム送り (1/30s)</div>
+  <div class="frame-info">SYNCで編集対象切替 / ◀▶ フレーム送り (1/30s)</div>
 </div>
 
 <script>
@@ -416,19 +419,16 @@
   const timeDur = document.getElementById('time-dur');
   const playIcon = document.getElementById('play-icon');
   const pauseIcon = document.getElementById('pause-icon');
+  const syncToggleEl = document.getElementById('sync-toggle');
+  const syncLabelEl = document.getElementById('sync-label');
 
   let hasA = false, hasB = false;
-  let syncEnabled = true;
+  let controlTarget = 'a';
   let isScrubbing = false;
   let rafId = null;
-  let syncTimer = null;
   const objectUrls = { a: null, b: null };
 
   const FRAME = 1 / 30;
-  const DRIFT_SOFT_LIMIT = 0.035;
-  const DRIFT_HARD_LIMIT = 0.25;
-  const MAX_RATE_OFFSET = 0.08;
-  const SYNC_INTERVAL_MS = 180;
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -441,10 +441,40 @@
     return Math.min(max, Math.max(min, v));
   }
 
-  function getMasterVideo() {
-    if (hasA) return vA;
-    if (hasB) return vB;
+  function getVideoById(id) {
+    return id === 'a' ? vA : vB;
+  }
+
+  function getActiveTargetId() {
+    if (controlTarget === 'a' && hasA) return 'a';
+    if (controlTarget === 'b' && hasB) return 'b';
+    if (hasA) return 'a';
+    if (hasB) return 'b';
     return null;
+  }
+
+  function getMasterVideo() {
+    const id = getActiveTargetId();
+    return id ? getVideoById(id) : null;
+  }
+
+  function getTargetVideo() {
+    const id = getActiveTargetId();
+    return id ? getVideoById(id) : null;
+  }
+
+  function updateSyncUi() {
+    const activeId = getActiveTargetId() || controlTarget;
+    const isA = activeId !== 'b';
+    syncToggleEl.classList.toggle('on', isA);
+    syncToggleEl.classList.toggle('b-mode', !isA);
+    syncLabelEl.textContent = isA ? 'EDIT A' : 'EDIT B';
+  }
+
+  function setControlTarget(id) {
+    controlTarget = id === 'b' ? 'b' : 'a';
+    updateSyncUi();
+    updateTimeUi();
   }
 
   function paintScrubber(pct) {
@@ -485,29 +515,6 @@
     return aPaused && bPaused;
   }
 
-  function syncSlaveToMaster(forceSeek = false) {
-    if (!syncEnabled || !hasA || !hasB || isScrubbing) return;
-    if (!forceSeek && (vA.paused || vB.paused)) return;
-
-    const drift = vA.currentTime - vB.currentTime;
-    const absDrift = Math.abs(drift);
-
-    if (forceSeek || absDrift > DRIFT_HARD_LIMIT) {
-      // Hard seek is expensive, so do it only when drift is large.
-      vB.currentTime = vA.currentTime;
-      vB.playbackRate = vA.playbackRate;
-      return;
-    }
-
-    if (absDrift > DRIFT_SOFT_LIMIT) {
-      const delta = clamp(drift * 0.25, -MAX_RATE_OFFSET, MAX_RATE_OFFSET);
-      vB.playbackRate = clamp(vA.playbackRate + delta, 0.25, 2);
-      return;
-    }
-
-    vB.playbackRate = vA.playbackRate;
-  }
-
   function tick() {
     updateTimeUi();
     if (!bothPaused()) {
@@ -525,29 +532,15 @@
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   }
 
-  function startSyncLoop() {
-    if (syncTimer || !syncEnabled || !hasA || !hasB) return;
-    syncTimer = setInterval(() => syncSlaveToMaster(false), SYNC_INTERVAL_MS);
-  }
-
-  function stopSyncLoop() {
-    if (syncTimer) {
-      clearInterval(syncTimer);
-      syncTimer = null;
-    }
-    if (hasB && hasA) vB.playbackRate = vA.playbackRate;
-  }
-
   function startRuntimeLoops() {
     startTick();
-    startSyncLoop();
   }
 
   function stopRuntimeLoops() {
     stopTick();
-    stopSyncLoop();
   }
 
+  updateSyncUi();
   updateTimeUi();
 
   function setLayout(dir) {
@@ -576,6 +569,10 @@
 
     if (id === 'a') hasA = true; else hasB = true;
 
+    if (!hasA && hasB) setControlTarget('b');
+    if (!hasB && hasA) setControlTarget('a');
+    updateSyncUi();
+
     vid.addEventListener('loadedmetadata', () => {
       updateTimeUi();
     }, { once: true });
@@ -590,11 +587,6 @@
       stopRuntimeLoops();
       refreshPlayUi();
       return;
-    }
-
-    // Sync B to A before playing
-    if (hasA && hasB && syncEnabled) {
-      syncSlaveToMaster(true);
     }
 
     const plays = [];
@@ -612,25 +604,22 @@
   function onScrub(val) {
     isScrubbing = true;
     const pct = val / 1000;
-    if (hasA && vA.duration) vA.currentTime = vA.duration * pct;
-    if (hasB && syncEnabled && vB.duration) vB.currentTime = vB.duration * pct;
-    if (!hasA && hasB && vB.duration) vB.currentTime = vB.duration * pct;
+    const target = getTargetVideo();
+    if (target && target.duration) target.currentTime = target.duration * pct;
     paintScrubber(pct);
     const master = getMasterVideo();
     timeCur.textContent = fmt(master ? master.currentTime : 0);
     clearTimeout(onScrub._t);
     onScrub._t = setTimeout(() => {
       isScrubbing = false;
-      if (syncEnabled) syncSlaveToMaster(true);
       updateTimeUi();
     }, 120);
   }
 
   function seekStep(secs) {
-    if (hasA) vA.currentTime = Math.max(0, Math.min(vA.duration || 0, vA.currentTime + secs));
-    if (!hasA && hasB) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vB.currentTime + secs));
-    if (hasB && hasA && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
-    if (syncEnabled) syncSlaveToMaster(true);
+    const target = getTargetVideo();
+    if (!target) return;
+    target.currentTime = Math.max(0, Math.min(target.duration || 0, target.currentTime + secs));
     updateTimeUi();
   }
 
@@ -639,10 +628,9 @@
     if (hasB) vB.pause();
     stopRuntimeLoops();
     refreshPlayUi();
-    if (hasA) vA.currentTime = Math.max(0, Math.min(vA.duration || 0, vA.currentTime + dir * FRAME));
-    if (!hasA && hasB) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vB.currentTime + dir * FRAME));
-    if (hasB && hasA && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
-    if (syncEnabled) syncSlaveToMaster(true);
+    const target = getTargetVideo();
+    if (!target) return;
+    target.currentTime = Math.max(0, Math.min(target.duration || 0, target.currentTime + dir * FRAME));
     updateTimeUi();
   }
 
@@ -650,18 +638,16 @@
     const s = parseFloat(val);
     if (hasA) vA.playbackRate = s;
     if (hasB) vB.playbackRate = s;
-    if (syncEnabled) syncSlaveToMaster(true);
   }
 
   function toggleSync() {
-    syncEnabled = !syncEnabled;
-    document.getElementById('sync-toggle').classList.toggle('on', syncEnabled);
-    if (syncEnabled) {
-      syncSlaveToMaster(true);
-      startSyncLoop();
-    } else {
-      stopSyncLoop();
+    if (hasA && hasB) {
+      setControlTarget(controlTarget === 'a' ? 'b' : 'a');
+      return;
     }
+
+    if (hasA) setControlTarget('a');
+    if (hasB) setControlTarget('b');
   }
 
   [vA, vB].forEach(v => {
