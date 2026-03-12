@@ -323,6 +323,140 @@
     text-align: center;
     margin-top: 6px;
   }
+
+  /* SETTINGS BUTTON */
+  .settings-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .settings-btn:hover { color: var(--text); }
+
+  /* SETTINGS DRAWER */
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .settings-overlay.open { opacity: 1; pointer-events: auto; }
+
+  .settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 260px;
+    max-width: 80vw;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .settings-drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .drawer-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--accent);
+  }
+  .drawer-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+  .drawer-close:hover { color: var(--text); }
+
+  .drawer-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .drawer-section-title {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+
+  .audio-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .audio-row:last-child { margin-bottom: 0; }
+
+  .audio-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    min-width: 28px;
+    color: var(--text);
+  }
+
+  .mute-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .mute-btn.muted {
+    color: #ff5566;
+    border-color: #ff5566;
+    background: rgba(255,85,102,0.1);
+  }
+
+  .vol-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  .vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
 </style>
 </head>
 <body>
@@ -332,8 +466,35 @@
   <div class="header-controls">
     <button class="layout-btn active" id="btn-v" onclick="setLayout('v')">縦並び</button>
     <button class="layout-btn" id="btn-h" onclick="setLayout('h')">横並び</button>
+    <button class="settings-btn" id="open-settings" onclick="openSettings()">⚙</button>
   </div>
 </header>
+
+<!-- SETTINGS DRAWER -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettings()"></div>
+<div class="settings-drawer" id="settings-drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">SETTINGS</div>
+    <button class="drawer-close" onclick="closeSettings()">✕</button>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-section-title">AUDIO</div>
+    <div class="audio-row">
+      <span class="audio-label">A</span>
+      <button class="mute-btn" id="mute-a" onclick="toggleMute('a')">
+        <svg id="vol-icon-a" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+      </button>
+      <input type="range" class="vol-slider" id="vol-a" min="0" max="100" value="100" oninput="setVolume('a', this.value)">
+    </div>
+    <div class="audio-row">
+      <span class="audio-label">B</span>
+      <button class="mute-btn" id="mute-b" onclick="toggleMute('b')">
+        <svg id="vol-icon-b" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+      </button>
+      <input type="range" class="vol-slider" id="vol-b" min="0" max="100" value="100" oninput="setVolume('b', this.value)">
+    </div>
+  </div>
+</div>
 
 <div id="video-area" class="layout-v">
 
@@ -408,7 +569,7 @@
       <option value="2">2x</option>
     </select>
   </div>
-  <div class="frame-info">SYNCで編集対象切替 / ◀▶ フレーム送り (1/30s)</div>
+  <div class="frame-info">EDITで編集対象切替 / ◀▶ フレーム送り (1/30s)</div>
 </div>
 
 <script>
@@ -638,16 +799,12 @@
     const videos = getLoadedVideos();
     if (!videos.length) return;
 
-    // Wait until both videos have enough data buffered to play through
+    // Wait until both videos have enough data buffered
     await Promise.all(videos.map(v => waitUntilBuffered(v)));
 
-    // Fire both play() in the same animation frame
-    await new Promise(resolve => {
-      requestAnimationFrame(() => {
-        videos.forEach(v => v.play().catch(() => {}));
-        resolve();
-      });
-    });
+    // Fire all play() synchronously — no rAF, no await on play promises
+    // This is the tightest possible timing the browser allows
+    videos.forEach(v => v.play().catch(() => {}));
 
     startRuntimeLoops();
     refreshPlayUi();
@@ -728,6 +885,34 @@
     if (e.code === 'KeyJ') seekStep(-10);
     if (e.code === 'KeyL') seekStep(10);
   });
+
+  // --- Settings drawer ---
+  function openSettings() {
+    document.getElementById('settings-overlay').classList.add('open');
+    document.getElementById('settings-drawer').classList.add('open');
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-overlay').classList.remove('open');
+    document.getElementById('settings-drawer').classList.remove('open');
+  }
+
+  const muteIcon = '<path d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>';
+  const mutedIcon = '<path d="M3 9v6h4l5 5V4L7 9H3z"/><line x1="18" y1="9" x2="24" y2="15" stroke="currentColor" stroke-width="2"/><line x1="24" y1="9" x2="18" y2="15" stroke="currentColor" stroke-width="2"/>';
+
+  function toggleMute(id) {
+    const vid = id === 'a' ? vA : vB;
+    vid.muted = !vid.muted;
+    const btn = document.getElementById('mute-' + id);
+    const icon = document.getElementById('vol-icon-' + id);
+    btn.classList.toggle('muted', vid.muted);
+    icon.innerHTML = vid.muted ? mutedIcon : muteIcon;
+  }
+
+  function setVolume(id, val) {
+    const vid = id === 'a' ? vA : vB;
+    vid.volume = clamp(parseInt(val, 10) / 100, 0, 1);
+  }
 
   window.addEventListener('beforeunload', () => {
     if (objectUrls.a) URL.revokeObjectURL(objectUrls.a);
