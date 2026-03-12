@@ -426,13 +426,11 @@
   let controlTarget = 'a';
   let isScrubbing = false;
   let rafId = null;
-  let startAlignTimer = null;
+  let isPriming = false;
   const objectUrls = { a: null, b: null };
+  const primedSource = { a: null, b: null };
 
   const FRAME = 1 / 30;
-  const START_ALIGN_WINDOW_MS = 900;
-  const START_ALIGN_INTERVAL_MS = 70;
-  const START_ALIGN_LIMIT = 0.06;
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -447,6 +445,10 @@
 
   function getVideoById(id) {
     return id === 'a' ? vA : vB;
+  }
+
+  function getVideoId(video) {
+    return video === vA ? 'a' : 'b';
   }
 
   function getActiveTargetId() {
@@ -564,34 +566,26 @@
     });
   }
 
-  function clearStartAlignTimer() {
-    if (startAlignTimer) {
-      clearInterval(startAlignTimer);
-      startAlignTimer = null;
+  async function primeVideoForStart(video) {
+    const id = getVideoId(video);
+    const srcKey = video.currentSrc || video.src;
+    if (!srcKey || primedSource[id] === srcKey) return;
+
+    const resumeAt = video.currentTime;
+    const wasMuted = video.muted;
+
+    try {
+      video.muted = true;
+      await video.play();
+      await new Promise(resolve => setTimeout(resolve, 45));
+      video.pause();
+      if (isFinite(resumeAt)) video.currentTime = resumeAt;
+      primedSource[id] = srcKey;
+    } catch (e) {
+      // Priming is best-effort. Ignore failures and continue normal playback.
+    } finally {
+      video.muted = wasMuted;
     }
-  }
-
-  function runStartAlignLock(baseOffset) {
-    if (!hasA || !hasB) return;
-
-    clearStartAlignTimer();
-    const stopAt = performance.now() + START_ALIGN_WINDOW_MS;
-
-    startAlignTimer = setInterval(() => {
-      if (vA.paused || vB.paused) {
-        clearStartAlignTimer();
-        return;
-      }
-
-      const driftFromOffset = (vB.currentTime - vA.currentTime) - baseOffset;
-      if (Math.abs(driftFromOffset) > START_ALIGN_LIMIT) {
-        vB.currentTime = vA.currentTime + baseOffset;
-      }
-
-      if (performance.now() >= stopAt) {
-        clearStartAlignTimer();
-      }
-    }, START_ALIGN_INTERVAL_MS);
   }
 
   function tick() {
@@ -617,7 +611,6 @@
 
   function stopRuntimeLoops() {
     stopTick();
-    clearStartAlignTimer();
   }
 
   updateSyncUi();
@@ -640,6 +633,7 @@
 
     if (objectUrls[id]) URL.revokeObjectURL(objectUrls[id]);
     objectUrls[id] = URL.createObjectURL(file);
+    primedSource[id] = null;
     vid.src = objectUrls[id];
     vid.preload = 'auto';
     vid.load();
@@ -673,8 +667,14 @@
     const videos = getLoadedVideos();
     if (!videos.length) return;
 
-    const baseOffset = (hasA && hasB) ? (vB.currentTime - vA.currentTime) : 0;
     await Promise.all(videos.map(v => waitUntilPlayable(v)));
+
+    isPriming = true;
+    try {
+      await Promise.all(videos.map(v => primeVideoForStart(v)));
+    } finally {
+      isPriming = false;
+    }
 
     const plays = [];
     if (hasA) plays.push(vA.play());
@@ -684,7 +684,6 @@
       await Promise.all(plays);
     } catch(e) { /* autoplay blocked etc */ }
 
-    runStartAlignLock(baseOffset);
     startRuntimeLoops();
     refreshPlayUi();
   }
@@ -740,16 +739,19 @@
 
   [vA, vB].forEach(v => {
     v.addEventListener('play', () => {
+      if (isPriming) return;
       startRuntimeLoops();
       refreshPlayUi();
     });
 
     v.addEventListener('pause', () => {
+      if (isPriming) return;
       if (bothPaused()) stopRuntimeLoops();
       refreshPlayUi();
     });
 
     v.addEventListener('ended', () => {
+      if (isPriming) return;
       if (bothPaused()) stopRuntimeLoops();
       refreshPlayUi();
       updateTimeUi();
@@ -766,7 +768,6 @@
   });
 
   window.addEventListener('beforeunload', () => {
-    clearStartAlignTimer();
     if (objectUrls.a) URL.revokeObjectURL(objectUrls.a);
     if (objectUrls.b) URL.revokeObjectURL(objectUrls.b);
   });
