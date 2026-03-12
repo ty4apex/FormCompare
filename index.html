@@ -667,8 +667,10 @@
     const videos = getLoadedVideos();
     if (!videos.length) return;
 
+    // 1) Ensure both videos are ready to play
     await Promise.all(videos.map(v => waitUntilPlayable(v)));
 
+    // 2) Prime decoders (warm up)
     isPriming = true;
     try {
       await Promise.all(videos.map(v => primeVideoForStart(v)));
@@ -676,13 +678,36 @@
       isPriming = false;
     }
 
-    const plays = [];
-    if (hasA) plays.push(vA.play());
-    if (hasB) plays.push(vB.play());
+    // 3) Wait for both to be seeked back to position after priming
+    await Promise.all(videos.map(v => waitUntilPlayable(v, 800)));
 
-    try {
-      await Promise.all(plays);
-    } catch(e) { /* autoplay blocked etc */ }
+    // 4) Record intended start positions
+    const startA = hasA ? vA.currentTime : 0;
+    const startB = hasB ? vB.currentTime : 0;
+
+    // 5) Fire both play() in the same animation frame for tightest sync
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        const promises = [];
+        if (hasA) promises.push(vA.play());
+        if (hasB) promises.push(vB.play());
+        Promise.all(promises).catch(() => {});
+        resolve();
+      });
+    });
+
+    // 6) One-shot correction after both are actually rendering
+    if (hasA && hasB) {
+      setTimeout(() => {
+        if (vA.paused || vB.paused) return;
+        const elapsed = vA.currentTime - startA;
+        const expected = startB + elapsed;
+        const drift = Math.abs(vB.currentTime - expected);
+        if (drift > 0.04) {
+          vB.currentTime = expected;
+        }
+      }, 150);
+    }
 
     startRuntimeLoops();
     refreshPlayUi();
