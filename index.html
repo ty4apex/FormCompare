@@ -350,7 +350,7 @@
       </div>
       <div class="slot-label" id="label-a">VIDEO A</div>
       <button class="change-btn" id="change-a" onclick="triggerFile('a')">CHANGE</button>
-      <video id="video-a" preload="metadata" playsinline webkit-playsinline></video>
+      <video id="video-a" preload="auto" playsinline webkit-playsinline></video>
     </div>
     <input type="file" id="file-a" accept="video/*" onchange="loadVideo('a',this)">
   </div>
@@ -368,7 +368,7 @@
       </div>
       <div class="slot-label" id="label-b">VIDEO B</div>
       <button class="change-btn" id="change-b" onclick="triggerFile('b')">CHANGE</button>
-      <video id="video-b" preload="metadata" playsinline webkit-playsinline></video>
+      <video id="video-b" preload="auto" playsinline webkit-playsinline></video>
     </div>
     <input type="file" id="file-b" accept="video/*" onchange="loadVideo('b',this)">
   </div>
@@ -426,9 +426,13 @@
   let controlTarget = 'a';
   let isScrubbing = false;
   let rafId = null;
+  let startAlignTimer = null;
   const objectUrls = { a: null, b: null };
 
   const FRAME = 1 / 30;
+  const START_ALIGN_WINDOW_MS = 900;
+  const START_ALIGN_INTERVAL_MS = 70;
+  const START_ALIGN_LIMIT = 0.06;
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -515,6 +519,81 @@
     return aPaused && bPaused;
   }
 
+  function getLoadedVideos() {
+    const videos = [];
+    if (hasA) videos.push(vA);
+    if (hasB) videos.push(vB);
+    return videos;
+  }
+
+  function waitUntilPlayable(video, timeoutMs = 1200) {
+    if (!video) return Promise.resolve();
+    if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.seeking) {
+      return Promise.resolve();
+    }
+
+    return new Promise(resolve => {
+      let done = false;
+      let timerId = null;
+
+      const cleanup = () => {
+        video.removeEventListener('canplay', onReady);
+        video.removeEventListener('seeked', onReady);
+        video.removeEventListener('loadeddata', onReady);
+        if (timerId) clearTimeout(timerId);
+      };
+
+      const finish = () => {
+        if (done) return;
+        done = true;
+        cleanup();
+        resolve();
+      };
+
+      const onReady = () => {
+        if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && !video.seeking) {
+          finish();
+        }
+      };
+
+      timerId = setTimeout(finish, timeoutMs);
+      video.addEventListener('canplay', onReady);
+      video.addEventListener('seeked', onReady);
+      video.addEventListener('loadeddata', onReady);
+      onReady();
+    });
+  }
+
+  function clearStartAlignTimer() {
+    if (startAlignTimer) {
+      clearInterval(startAlignTimer);
+      startAlignTimer = null;
+    }
+  }
+
+  function runStartAlignLock(baseOffset) {
+    if (!hasA || !hasB) return;
+
+    clearStartAlignTimer();
+    const stopAt = performance.now() + START_ALIGN_WINDOW_MS;
+
+    startAlignTimer = setInterval(() => {
+      if (vA.paused || vB.paused) {
+        clearStartAlignTimer();
+        return;
+      }
+
+      const driftFromOffset = (vB.currentTime - vA.currentTime) - baseOffset;
+      if (Math.abs(driftFromOffset) > START_ALIGN_LIMIT) {
+        vB.currentTime = vA.currentTime + baseOffset;
+      }
+
+      if (performance.now() >= stopAt) {
+        clearStartAlignTimer();
+      }
+    }, START_ALIGN_INTERVAL_MS);
+  }
+
   function tick() {
     updateTimeUi();
     if (!bothPaused()) {
@@ -538,6 +617,7 @@
 
   function stopRuntimeLoops() {
     stopTick();
+    clearStartAlignTimer();
   }
 
   updateSyncUi();
@@ -561,6 +641,7 @@
     if (objectUrls[id]) URL.revokeObjectURL(objectUrls[id]);
     objectUrls[id] = URL.createObjectURL(file);
     vid.src = objectUrls[id];
+    vid.preload = 'auto';
     vid.load();
 
     document.getElementById('zone-' + id).classList.add('hidden');
@@ -589,6 +670,12 @@
       return;
     }
 
+    const videos = getLoadedVideos();
+    if (!videos.length) return;
+
+    const baseOffset = (hasA && hasB) ? (vB.currentTime - vA.currentTime) : 0;
+    await Promise.all(videos.map(v => waitUntilPlayable(v)));
+
     const plays = [];
     if (hasA) plays.push(vA.play());
     if (hasB) plays.push(vB.play());
@@ -597,6 +684,7 @@
       await Promise.all(plays);
     } catch(e) { /* autoplay blocked etc */ }
 
+    runStartAlignLock(baseOffset);
     startRuntimeLoops();
     refreshPlayUi();
   }
@@ -678,6 +766,7 @@
   });
 
   window.addEventListener('beforeunload', () => {
+    clearStartAlignTimer();
     if (objectUrls.a) URL.revokeObjectURL(objectUrls.a);
     if (objectUrls.b) URL.revokeObjectURL(objectUrls.b);
   });
