@@ -11,14 +11,13 @@
 <meta name="apple-mobile-web-app-title" content="FORM CMP">
 <link rel="apple-touch-icon" href="icon.png">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap');
 
   :root {
     --bg: #0a0a0c;
     --surface: #111116;
     --panel: #16161e;
     --accent: #e8ff47;
-    --accent2: #ff4757;
     --text: #f0f0f0;
     --muted: #555566;
     --border: #222230;
@@ -26,14 +25,18 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-  body {
+  html, body {
+    height: 100%;
     background: var(--bg);
     color: var(--text);
     font-family: 'DM Mono', monospace;
-    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  body {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    height: 100dvh;
   }
 
   /* HEADER */
@@ -45,7 +48,6 @@
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     flex-shrink: 0;
-    z-index: 10;
   }
 
   .logo {
@@ -56,17 +58,9 @@
     line-height: 1;
   }
 
-  .logo span {
-    color: var(--muted);
-    font-size: 14px;
-    letter-spacing: 2px;
-  }
+  .logo span { color: var(--muted); font-size: 14px; letter-spacing: 2px; }
 
-  .header-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
+  .header-controls { display: flex; gap: 8px; align-items: center; }
 
   .layout-btn {
     background: var(--panel);
@@ -84,15 +78,15 @@
   .layout-btn.active {
     border-color: var(--accent);
     color: var(--accent);
-    background: rgba(232, 255, 71, 0.08);
+    background: rgba(232,255,71,0.08);
   }
 
-  /* MAIN VIDEO AREA */
+  /* VIDEO AREA */
   #video-area {
     flex: 1;
     display: flex;
     overflow: hidden;
-    position: relative;
+    min-height: 0;
   }
 
   #video-area.layout-v { flex-direction: column; }
@@ -103,16 +97,14 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    background: var(--surface);
+    background: #000;
     overflow: hidden;
+    min-height: 0;
+    min-width: 0;
   }
 
-  #video-area.layout-v .video-slot:first-child {
-    border-bottom: 2px solid var(--accent);
-  }
-  #video-area.layout-h .video-slot:first-child {
-    border-right: 2px solid var(--accent);
-  }
+  #video-area.layout-v .video-slot:first-child { border-bottom: 2px solid var(--accent); }
+  #video-area.layout-h .video-slot:first-child { border-right: 2px solid var(--accent); }
 
   .video-wrapper {
     flex: 1;
@@ -120,8 +112,8 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    background: #000;
     overflow: hidden;
+    min-height: 0;
   }
 
   video {
@@ -141,10 +133,9 @@
     justify-content: center;
     gap: 12px;
     cursor: pointer;
-    transition: background 0.2s;
+    background: #000;
   }
 
-  .upload-zone:hover { background: rgba(232,255,71,0.03); }
   .upload-zone.hidden { display: none; }
 
   .upload-icon {
@@ -155,13 +146,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color 0.2s;
   }
-
-  .upload-zone:hover .upload-icon { border-color: var(--accent); }
-
-  .upload-icon svg { color: var(--muted); transition: color 0.2s; }
-  .upload-zone:hover .upload-icon svg { color: var(--accent); }
 
   .upload-text {
     font-size: 11px;
@@ -178,7 +163,7 @@
     position: absolute;
     top: 8px;
     left: 8px;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     border: 1px solid var(--border);
     padding: 3px 8px;
     border-radius: 4px;
@@ -187,16 +172,14 @@
     color: var(--accent);
     pointer-events: none;
     z-index: 5;
+    display: none;
   }
 
-  .slot-label.hidden { display: none; }
-
-  /* CHANGE VIDEO BTN */
   .change-btn {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     border: 1px solid var(--border);
     color: var(--muted);
     padding: 4px 8px;
@@ -209,18 +192,14 @@
     display: none;
   }
 
-  .change-btn:hover { color: var(--text); border-color: var(--muted); }
-
-  /* CONTROLS BAR */
+  /* CONTROLS */
   #controls {
     background: var(--surface);
     border-top: 1px solid var(--border);
-    padding: 10px 16px 12px;
+    padding: 10px 16px 14px;
     flex-shrink: 0;
-    z-index: 10;
   }
 
-  /* SCRUBBER */
   .scrubber-row {
     display: flex;
     align-items: center;
@@ -245,13 +224,12 @@
     background: var(--border);
     outline: none;
     cursor: pointer;
-    position: relative;
   }
 
   #scrubber::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: var(--accent);
     cursor: pointer;
@@ -259,7 +237,29 @@
     box-shadow: 0 0 8px rgba(232,255,71,0.4);
   }
 
-  /* CONTROL BUTTONS ROW */
+  .sync-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .sync-toggle.on { color: var(--accent); }
+  .sync-toggle.on .sync-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
   .btn-row {
     display: flex;
     align-items: center;
@@ -290,18 +290,16 @@
     background: rgba(232,255,71,0.06);
   }
 
-  .ctrl-btn.primary:hover { background: rgba(232,255,71,0.12); }
-
   .ctrl-btn.secondary {
     width: 40px;
     height: 40px;
     font-size: 11px;
     color: var(--muted);
+    letter-spacing: 0.5px;
   }
 
-  .ctrl-btn.secondary:hover { color: var(--text); border-color: var(--muted); }
+  .ctrl-btn.secondary:hover { color: var(--text); }
 
-  /* SPEED SELECTOR */
   .speed-select {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -315,31 +313,6 @@
     letter-spacing: 1px;
   }
 
-  /* SYNC TOGGLE */
-  .sync-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 2px;
-    margin-left: auto;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .sync-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    transition: background 0.2s;
-  }
-
-  .sync-toggle.on .sync-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-  .sync-toggle.on { color: var(--accent); }
-
-  /* FRAME STEP info */
   .frame-info {
     font-size: 9px;
     color: var(--muted);
@@ -347,129 +320,12 @@
     text-align: center;
     margin-top: 6px;
   }
-
-  /* OFFSET ROW */
-  .offset-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 8px 10px;
-    background: var(--panel);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-  }
-
-  .offset-label {
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .offset-label span {
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 500;
-  }
-
-  #offset-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-    outline: none;
-    cursor: pointer;
-  }
-
-  #offset-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #ff4757;
-    cursor: pointer;
-    border: 2px solid var(--bg);
-    box-shadow: 0 0 8px rgba(255,71,87,0.5);
-  }
-
-  .offset-reset {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 10px;
-    font-family: 'DM Mono', monospace;
-    padding: 3px 7px;
-    border-radius: 4px;
-    cursor: pointer;
-    letter-spacing: 1px;
-    flex-shrink: 0;
-  }
-
-  .offset-reset:hover { color: var(--text); border-color: var(--muted); }
-
-  /* Individual seek buttons per video */
-  .indiv-seek {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
-    justify-content: space-between;
-  }
-
-  .indiv-group {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .indiv-label {
-    font-size: 9px;
-    color: var(--muted);
-    letter-spacing: 2px;
-    min-width: 16px;
-  }
-
-  .indiv-btn {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 10px;
-    font-family: 'DM Mono', monospace;
-    cursor: pointer;
-    letter-spacing: 1px;
-  }
-
-  .indiv-btn:active { transform: scale(0.93); }
-  .indiv-btn:hover { color: var(--text); }
-
-  /* OVERLAY EFFECT */
-  .video-slot::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.3) 100%);
-  }
-
-  /* DRAG OVER STATE */
-  .upload-zone.drag-over .upload-icon {
-    border-color: var(--accent);
-    background: rgba(232,255,71,0.1);
-  }
-
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="logo">FORM<span> COMPARE</span></div>
-  </div>
+  <div class="logo">FORM<span> COMPARE</span></div>
   <div class="header-controls">
     <button class="layout-btn active" id="btn-v" onclick="setLayout('v')">縦並び</button>
     <button class="layout-btn" id="btn-h" onclick="setLayout('h')">横並び</button>
@@ -478,77 +334,49 @@
 
 <div id="video-area" class="layout-v">
 
-  <!-- SLOT A -->
   <div class="video-slot" id="slot-a">
     <div class="video-wrapper">
-      <div class="upload-zone" id="zone-a" onclick="triggerFile('a')"
-           ondragover="dragOver(event,'a')" ondragleave="dragLeave('a')" ondrop="dropFile(event,'a')">
+      <div class="upload-zone" id="zone-a" onclick="triggerFile('a')">
         <div class="upload-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <svg width="20" height="20" fill="none" stroke="#555566" stroke-width="1.5" viewBox="0 0 24 24">
             <path d="M15 10l-4 4-4-4M12 14V3"/>
             <rect x="3" y="17" width="18" height="4" rx="2"/>
           </svg>
         </div>
         <div class="upload-text">VIDEO A<br>タップして選択</div>
       </div>
-      <div class="slot-label hidden" id="label-a">VIDEO A</div>
+      <div class="slot-label" id="label-a">VIDEO A</div>
       <button class="change-btn" id="change-a" onclick="triggerFile('a')">CHANGE</button>
-      <video id="video-a" preload="metadata" playsinline></video>
+      <video id="video-a" preload="auto" playsinline webkit-playsinline></video>
     </div>
-    <input type="file" id="file-a" accept="video/*" onchange="loadVideo('a', this)">
+    <input type="file" id="file-a" accept="video/*" onchange="loadVideo('a',this)">
   </div>
 
-  <!-- SLOT B -->
   <div class="video-slot" id="slot-b">
     <div class="video-wrapper">
-      <div class="upload-zone" id="zone-b" onclick="triggerFile('b')"
-           ondragover="dragOver(event,'b')" ondragleave="dragLeave('b')" ondrop="dropFile(event,'b')">
+      <div class="upload-zone" id="zone-b" onclick="triggerFile('b')">
         <div class="upload-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <svg width="20" height="20" fill="none" stroke="#555566" stroke-width="1.5" viewBox="0 0 24 24">
             <path d="M15 10l-4 4-4-4M12 14V3"/>
             <rect x="3" y="17" width="18" height="4" rx="2"/>
           </svg>
         </div>
         <div class="upload-text">VIDEO B<br>タップして選択</div>
       </div>
-      <div class="slot-label hidden" id="label-b">VIDEO B</div>
+      <div class="slot-label" id="label-b">VIDEO B</div>
       <button class="change-btn" id="change-b" onclick="triggerFile('b')">CHANGE</button>
-      <video id="video-b" preload="metadata" playsinline></video>
+      <video id="video-b" preload="auto" playsinline webkit-playsinline></video>
     </div>
-    <input type="file" id="file-b" accept="video/*" onchange="loadVideo('b', this)">
+    <input type="file" id="file-b" accept="video/*" onchange="loadVideo('b',this)">
   </div>
 
 </div>
 
-<!-- CONTROLS -->
 <div id="controls">
-
-  <!-- OFFSET ROW -->
-  <div class="offset-row">
-    <div class="offset-label">B オフセット: <span id="offset-val">0.00s</span></div>
-    <input type="range" id="offset-slider" min="-10" max="10" step="0.05" value="0"
-           oninput="setOffset(this.value)">
-    <button class="offset-reset" onclick="resetOffset()">RESET</button>
-  </div>
-
-  <!-- INDIVIDUAL FRAME STEP -->
-  <div class="indiv-seek">
-    <div class="indiv-group">
-      <div class="indiv-label">A</div>
-      <button class="indiv-btn" onclick="seekFrameIndiv('a',-1)">◀ 1f</button>
-      <button class="indiv-btn" onclick="seekFrameIndiv('a', 1)">1f ▶</button>
-    </div>
-    <div class="indiv-group">
-      <div class="indiv-label" style="color:#ff4757">B</div>
-      <button class="indiv-btn" onclick="seekFrameIndiv('b',-1)">◀ 1f</button>
-      <button class="indiv-btn" onclick="seekFrameIndiv('b', 1)">1f ▶</button>
-    </div>
-  </div>
-
   <div class="scrubber-row">
     <span class="time-label" id="time-cur">0:00</span>
-    <input type="range" id="scrubber" min="0" max="100" step="0.1" value="0"
-           oninput="scrub(this.value)" onchange="scrub(this.value)">
+    <input type="range" id="scrubber" min="0" max="1000" step="1" value="0"
+           oninput="onScrub(this.value)">
     <span class="time-label" id="time-dur">0:00</span>
     <div class="sync-toggle on" id="sync-toggle" onclick="toggleSync()">
       <div class="sync-dot"></div>
@@ -557,19 +385,19 @@
   </div>
 
   <div class="btn-row">
-    <button class="ctrl-btn secondary" onclick="seekStep(-10)" title="-10秒">-10s</button>
-    <button class="ctrl-btn secondary" onclick="seekFrame(-1)" title="前のフレーム">
+    <button class="ctrl-btn secondary" onclick="seekStep(-10)">-10s</button>
+    <button class="ctrl-btn secondary" onclick="seekFrame(-1)">
       <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
     </button>
     <button class="ctrl-btn primary" id="play-btn" onclick="togglePlay()">
       <svg id="play-icon" width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       <svg id="pause-icon" width="22" height="22" fill="currentColor" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
     </button>
-    <button class="ctrl-btn secondary" onclick="seekFrame(1)" title="次のフレーム">
+    <button class="ctrl-btn secondary" onclick="seekFrame(1)">
       <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 4V8l-5.5 4zM16 6h2v12h-2z"/></svg>
     </button>
-    <button class="ctrl-btn secondary" onclick="seekStep(10)" title="+10秒">+10s</button>
-    <select class="speed-select" id="speed-select" onchange="setSpeed(this.value)">
+    <button class="ctrl-btn secondary" onclick="seekStep(10)">+10s</button>
+    <select class="speed-select" onchange="setSpeed(this.value)">
       <option value="0.25">0.25x</option>
       <option value="0.5">0.5x</option>
       <option value="1" selected>1x</option>
@@ -577,7 +405,7 @@
       <option value="2">2x</option>
     </select>
   </div>
-  <div class="frame-info">A/B 個別フレーム送り ／ ◀▶ 同時フレーム送り</div>
+  <div class="frame-info">◀▶ フレーム送り (1/30s)</div>
 </div>
 
 <script>
@@ -589,40 +417,57 @@
   const playIcon = document.getElementById('play-icon');
   const pauseIcon = document.getElementById('pause-icon');
 
-  let syncEnabled = true;
-  let isSeeking = false;
   let hasA = false, hasB = false;
-  // offsetB: how many seconds B is shifted relative to A
-  // positive = B starts later (B plays content from later in the video at same A time)
-  // negative = B starts earlier
-  let offsetB = 0;
-  let syncInterval = null;
+  let syncEnabled = true;
+  let isScrubbing = false;
+  let rafId = null;
 
   const FRAME = 1 / 30;
-  const SYNC_THRESHOLD = 0.08; // seconds: only correct if drift exceeds this
+  // How many seconds of drift before we correct B
+  const DRIFT_LIMIT = 0.15;
 
   function fmt(t) {
-    if (isNaN(t) || t < 0) t = 0;
+    if (!isFinite(t) || t < 0) t = 0;
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   }
 
-  function fmtMs(t) {
-    if (isNaN(t)) t = 0;
-    const m = Math.floor(t / 60);
-    const s = (Math.abs(t) % 60).toFixed(2).padStart(5, '0');
-    return (t < 0 ? '-' : '') + `${Math.abs(m)}:${s}`;
+  function updateScrubber() {
+    if (!hasA || isScrubbing) return;
+    const dur = vA.duration || 0;
+    const pct = dur ? vA.currentTime / dur : 0;
+    const val = Math.round(pct * 1000);
+    scrubber.value = val;
+    scrubber.style.background = `linear-gradient(to right,#e8ff47 ${pct*100}%,#222230 ${pct*100}%)`;
+    timeCur.textContent = fmt(vA.currentTime);
   }
 
-  // The "target" time for B given A's currentTime and offsetB
-  function bTargetTime() {
-    return vA.currentTime + offsetB;
+  // RAF loop: keep scrubber updated and correct B drift while playing
+  function tick() {
+    updateScrubber();
+    if (syncEnabled && hasA && hasB && !vA.paused && !isScrubbing) {
+      const drift = Math.abs(vB.currentTime - vA.currentTime);
+      if (drift > DRIFT_LIMIT) {
+        vB.currentTime = vA.currentTime;
+      }
+    }
+    rafId = requestAnimationFrame(tick);
   }
+
+  function startTick() {
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+
+  function stopTick() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // Always keep tick running so scrubber stays updated
+  startTick();
 
   function setLayout(dir) {
-    const area = document.getElementById('video-area');
-    area.className = 'layout-' + dir;
+    document.getElementById('video-area').className = 'layout-' + dir;
     document.getElementById('btn-v').classList.toggle('active', dir === 'v');
     document.getElementById('btn-h').classList.toggle('active', dir === 'h');
   }
@@ -634,162 +479,83 @@
   function loadVideo(id, input) {
     const file = input.files[0];
     if (!file) return;
-    const vid = document.getElementById('video-' + id);
-    const url = URL.createObjectURL(file);
-    vid.src = url;
-    vid.load();
+    const vid = id === 'a' ? vA : vB;
+    vid.src = URL.createObjectURL(file);
 
     document.getElementById('zone-' + id).classList.add('hidden');
-    document.getElementById('label-' + id).classList.remove('hidden');
+    document.getElementById('label-' + id).style.display = 'block';
     document.getElementById('change-' + id).style.display = 'block';
 
-    if (id === 'a') { hasA = true; }
-    else { hasB = true; }
+    if (id === 'a') hasA = true; else hasB = true;
 
     vid.addEventListener('loadedmetadata', () => {
-      updateDuration();
+      if (id === 'a') timeDur.textContent = fmt(vA.duration);
     }, { once: true });
 
     vid.addEventListener('ended', () => {
-      // check if both ended
-      const aEnded = !hasA || vA.ended;
-      const bEnded = !hasB || vB.ended;
-      if (aEnded && bEnded) {
+      // show play icon only if both ended (or other not loaded)
+      const aOk = !hasA || vA.ended || vA.paused;
+      const bOk = !hasB || vB.ended || vB.paused;
+      if (aOk && bOk) {
         playIcon.style.display = 'block';
         pauseIcon.style.display = 'none';
       }
     });
-
-    vid.playbackRate = parseFloat(document.getElementById('speed-select').value);
   }
 
-  function dropFile(e, id) {
-    e.preventDefault();
-    dragLeave(id);
-    const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith('video/')) return;
-    const input = document.getElementById('file-' + id);
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
-    loadVideo(id, input);
-  }
+  async function togglePlay() {
+    const isPlaying = (hasA && !vA.paused) || (hasB && !vB.paused);
 
-  function dragOver(e, id) {
-    e.preventDefault();
-    document.getElementById('zone-' + id).classList.add('drag-over');
-  }
-
-  function dragLeave(id) {
-    document.getElementById('zone-' + id).classList.remove('drag-over');
-  }
-
-  function updateDuration() {
-    const dur = (hasA && vA.duration) ? vA.duration : (hasB && vB.duration ? vB.duration : 0);
-    timeDur.textContent = fmt(dur);
-  }
-
-  // Sync loop: periodically correct B's time based on A + offsetB
-  function startSyncLoop() {
-    stopSyncLoop();
-    syncInterval = setInterval(() => {
-      if (!syncEnabled || !hasA || !hasB || isSeeking) return;
-      if (vA.paused) return;
-      const target = bTargetTime();
-      const clamped = Math.max(0, Math.min(vB.duration || Infinity, target));
-      const diff = Math.abs(vB.currentTime - clamped);
-      if (diff > SYNC_THRESHOLD) {
-        vB.currentTime = clamped;
-      }
-    }, 500);
-  }
-
-  function stopSyncLoop() {
-    if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
-  }
-
-  // Update scrubber from A
-  vA.addEventListener('timeupdate', () => {
-    if (isSeeking || !hasA) return;
-    const pct = vA.duration ? (vA.currentTime / vA.duration) * 100 : 0;
-    scrubber.value = pct;
-    scrubber.style.background = `linear-gradient(to right, #e8ff47 ${pct}%, #222230 ${pct}%)`;
-    timeCur.textContent = fmt(vA.currentTime);
-  });
-
-  function togglePlay() {
-    const playing = (hasA && !vA.paused) || (hasB && !vB.paused);
-    if (playing) {
+    if (isPlaying) {
       if (hasA) vA.pause();
       if (hasB) vB.pause();
-      stopSyncLoop();
       playIcon.style.display = 'block';
       pauseIcon.style.display = 'none';
-    } else {
-      // Align B before starting
-      if (hasA && hasB && syncEnabled) {
-        const target = Math.max(0, Math.min(vB.duration || Infinity, bTargetTime()));
-        vB.currentTime = target;
-      }
-      if (hasA) vA.play().catch(()=>{});
-      if (hasB) vB.play().catch(()=>{});
-      startSyncLoop();
-      playIcon.style.display = 'none';
-      pauseIcon.style.display = 'block';
+      return;
     }
+
+    // Sync B to A before playing
+    if (hasA && hasB && syncEnabled) {
+      vB.currentTime = vA.currentTime;
+    }
+
+    // Wait for both to be seeked/ready, then play together
+    const plays = [];
+    if (hasA) plays.push(vA.play());
+    if (hasB) plays.push(vB.play());
+
+    try {
+      await Promise.all(plays);
+    } catch(e) { /* autoplay blocked etc */ }
+
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = 'block';
   }
 
-  function scrub(val) {
-    isSeeking = true;
-    const pct = val / 100;
+  function onScrub(val) {
+    isScrubbing = true;
+    const pct = val / 1000;
     if (hasA && vA.duration) vA.currentTime = vA.duration * pct;
-    if (hasB && syncEnabled && vB.duration) {
-      const target = Math.max(0, Math.min(vB.duration, bTargetTime()));
-      vB.currentTime = target;
-    }
-    timeCur.textContent = fmt(vA.currentTime || 0);
-    scrubber.style.background = `linear-gradient(to right, #e8ff47 ${val}%, #222230 ${val}%)`;
-    setTimeout(() => { isSeeking = false; }, 150);
+    if (hasB && syncEnabled && vB.duration) vB.currentTime = vB.duration * pct;
+    const pctDisplay = pct * 100;
+    scrubber.style.background = `linear-gradient(to right,#e8ff47 ${pctDisplay}%,#222230 ${pctDisplay}%)`;
+    timeCur.textContent = fmt(hasA ? vA.currentTime : 0);
+    clearTimeout(onScrub._t);
+    onScrub._t = setTimeout(() => { isScrubbing = false; }, 200);
   }
 
   function seekStep(secs) {
     if (hasA) vA.currentTime = Math.max(0, Math.min(vA.duration || 0, vA.currentTime + secs));
-    if (hasB && syncEnabled) {
-      const target = Math.max(0, Math.min(vB.duration || 0, bTargetTime()));
-      vB.currentTime = target;
-    }
+    if (hasB && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
   }
 
   function seekFrame(dir) {
     if (hasA) vA.pause();
     if (hasB) vB.pause();
-    stopSyncLoop();
     playIcon.style.display = 'block';
     pauseIcon.style.display = 'none';
     if (hasA) vA.currentTime = Math.max(0, Math.min(vA.duration || 0, vA.currentTime + dir * FRAME));
-    if (hasB && syncEnabled) {
-      const target = Math.max(0, Math.min(vB.duration || 0, bTargetTime()));
-      vB.currentTime = target;
-    }
-  }
-
-  // Individual frame seek (does NOT move the other video)
-  function seekFrameIndiv(id, dir) {
-    const vid = id === 'a' ? vA : vB;
-    const has = id === 'a' ? hasA : hasB;
-    if (!has) return;
-    vid.pause();
-    if (id === 'a') vB.pause();
-    stopSyncLoop();
-    playIcon.style.display = 'block';
-    pauseIcon.style.display = 'none';
-    vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + dir * FRAME));
-    // Update offsetB based on new B position relative to A
-    if (id === 'b' && hasA) {
-      offsetB = vB.currentTime - vA.currentTime;
-      document.getElementById('offset-slider').value = Math.max(-10, Math.min(10, offsetB));
-      document.getElementById('offset-val').textContent = (offsetB >= 0 ? '+' : '') + offsetB.toFixed(2) + 's';
-    }
+    if (hasB && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
   }
 
   function setSpeed(val) {
@@ -800,31 +566,11 @@
 
   function toggleSync() {
     syncEnabled = !syncEnabled;
-    const el = document.getElementById('sync-toggle');
-    el.classList.toggle('on', syncEnabled);
-    if (!syncEnabled) stopSyncLoop();
+    document.getElementById('sync-toggle').classList.toggle('on', syncEnabled);
+    if (syncEnabled && hasA && hasB) vB.currentTime = vA.currentTime;
   }
 
-  function setOffset(val) {
-    offsetB = parseFloat(val);
-    document.getElementById('offset-val').textContent = (offsetB >= 0 ? '+' : '') + offsetB.toFixed(2) + 's';
-    // Immediately apply to B if paused
-    if (hasB && hasA) {
-      const target = Math.max(0, Math.min(vB.duration || 0, bTargetTime()));
-      vB.currentTime = target;
-    }
-  }
-
-  function resetOffset() {
-    offsetB = 0;
-    document.getElementById('offset-slider').value = 0;
-    document.getElementById('offset-val').textContent = '0.00s';
-    if (hasB && hasA) {
-      vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
-    }
-  }
-
-  // Keyboard shortcuts
+  // Keyboard
   document.addEventListener('keydown', e => {
     if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
     if (e.code === 'ArrowLeft') { e.preventDefault(); seekFrame(-1); }
@@ -832,19 +578,14 @@
     if (e.code === 'KeyJ') seekStep(-10);
     if (e.code === 'KeyL') seekStep(10);
   });
+</script>
 
-  // Scrubber fill init
-  scrubber.addEventListener('input', function() {
-    const pct = this.value;
-    this.style.background = `linear-gradient(to right, #e8ff47 ${pct}%, #222230 ${pct}%)`;
-  });
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js');
+    });
+  }
 </script>
 </body>
 </html>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js');
-  });
-}
-</script>
