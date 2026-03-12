@@ -347,7 +347,7 @@
       </div>
       <div class="slot-label" id="label-a">VIDEO A</div>
       <button class="change-btn" id="change-a" onclick="triggerFile('a')">CHANGE</button>
-      <video id="video-a" preload="auto" playsinline webkit-playsinline></video>
+      <video id="video-a" preload="metadata" playsinline webkit-playsinline></video>
     </div>
     <input type="file" id="file-a" accept="video/*" onchange="loadVideo('a',this)">
   </div>
@@ -365,7 +365,7 @@
       </div>
       <div class="slot-label" id="label-b">VIDEO B</div>
       <button class="change-btn" id="change-b" onclick="triggerFile('b')">CHANGE</button>
-      <video id="video-b" preload="auto" playsinline webkit-playsinline></video>
+      <video id="video-b" preload="metadata" playsinline webkit-playsinline></video>
     </div>
     <input type="file" id="file-b" accept="video/*" onchange="loadVideo('b',this)">
   </div>
@@ -421,10 +421,14 @@
   let syncEnabled = true;
   let isScrubbing = false;
   let rafId = null;
+  let syncTimer = null;
+  const objectUrls = { a: null, b: null };
 
   const FRAME = 1 / 30;
-  // How many seconds of drift before we correct B
-  const DRIFT_LIMIT = 0.15;
+  const DRIFT_SOFT_LIMIT = 0.035;
+  const DRIFT_HARD_LIMIT = 0.25;
+  const MAX_RATE_OFFSET = 0.08;
+  const SYNC_INTERVAL_MS = 180;
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -433,26 +437,84 @@
     return `${m}:${s}`;
   }
 
-  function updateScrubber() {
-    if (!hasA || isScrubbing) return;
-    const dur = vA.duration || 0;
-    const pct = dur ? vA.currentTime / dur : 0;
-    const val = Math.round(pct * 1000);
-    scrubber.value = val;
-    scrubber.style.background = `linear-gradient(to right,#e8ff47 ${pct*100}%,#222230 ${pct*100}%)`;
-    timeCur.textContent = fmt(vA.currentTime);
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
   }
 
-  // RAF loop: keep scrubber updated and correct B drift while playing
-  function tick() {
-    updateScrubber();
-    if (syncEnabled && hasA && hasB && !vA.paused && !isScrubbing) {
-      const drift = Math.abs(vB.currentTime - vA.currentTime);
-      if (drift > DRIFT_LIMIT) {
-        vB.currentTime = vA.currentTime;
-      }
+  function getMasterVideo() {
+    if (hasA) return vA;
+    if (hasB) return vB;
+    return null;
+  }
+
+  function paintScrubber(pct) {
+    const safePct = clamp(pct, 0, 1);
+    const fill = safePct * 100;
+    scrubber.value = Math.round(safePct * 1000);
+    scrubber.style.background = `linear-gradient(to right,#e8ff47 ${fill}%,#222230 ${fill}%)`;
+  }
+
+  function updateTimeUi() {
+    if (isScrubbing) return;
+    const master = getMasterVideo();
+    if (!master) {
+      paintScrubber(0);
+      timeCur.textContent = '0:00';
+      timeDur.textContent = '0:00';
+      return;
     }
-    rafId = requestAnimationFrame(tick);
+
+    const dur = master.duration || 0;
+    const pct = dur ? master.currentTime / dur : 0;
+    const val = Math.round(pct * 1000);
+    scrubber.value = val;
+    paintScrubber(pct);
+    timeCur.textContent = fmt(master.currentTime);
+    timeDur.textContent = fmt(dur);
+  }
+
+  function refreshPlayUi() {
+    const isPlaying = (hasA && !vA.paused) || (hasB && !vB.paused);
+    playIcon.style.display = isPlaying ? 'none' : 'block';
+    pauseIcon.style.display = isPlaying ? 'block' : 'none';
+  }
+
+  function bothPaused() {
+    const aPaused = !hasA || vA.paused;
+    const bPaused = !hasB || vB.paused;
+    return aPaused && bPaused;
+  }
+
+  function syncSlaveToMaster(forceSeek = false) {
+    if (!syncEnabled || !hasA || !hasB || isScrubbing) return;
+    if (!forceSeek && (vA.paused || vB.paused)) return;
+
+    const drift = vA.currentTime - vB.currentTime;
+    const absDrift = Math.abs(drift);
+
+    if (forceSeek || absDrift > DRIFT_HARD_LIMIT) {
+      // Hard seek is expensive, so do it only when drift is large.
+      vB.currentTime = vA.currentTime;
+      vB.playbackRate = vA.playbackRate;
+      return;
+    }
+
+    if (absDrift > DRIFT_SOFT_LIMIT) {
+      const delta = clamp(drift * 0.25, -MAX_RATE_OFFSET, MAX_RATE_OFFSET);
+      vB.playbackRate = clamp(vA.playbackRate + delta, 0.25, 2);
+      return;
+    }
+
+    vB.playbackRate = vA.playbackRate;
+  }
+
+  function tick() {
+    updateTimeUi();
+    if (!bothPaused()) {
+      rafId = requestAnimationFrame(tick);
+    } else {
+      rafId = null;
+    }
   }
 
   function startTick() {
@@ -463,8 +525,30 @@
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   }
 
-  // Always keep tick running so scrubber stays updated
-  startTick();
+  function startSyncLoop() {
+    if (syncTimer || !syncEnabled || !hasA || !hasB) return;
+    syncTimer = setInterval(() => syncSlaveToMaster(false), SYNC_INTERVAL_MS);
+  }
+
+  function stopSyncLoop() {
+    if (syncTimer) {
+      clearInterval(syncTimer);
+      syncTimer = null;
+    }
+    if (hasB && hasA) vB.playbackRate = vA.playbackRate;
+  }
+
+  function startRuntimeLoops() {
+    startTick();
+    startSyncLoop();
+  }
+
+  function stopRuntimeLoops() {
+    stopTick();
+    stopSyncLoop();
+  }
+
+  updateTimeUi();
 
   function setLayout(dir) {
     document.getElementById('video-area').className = 'layout-' + dir;
@@ -480,7 +564,11 @@
     const file = input.files[0];
     if (!file) return;
     const vid = id === 'a' ? vA : vB;
-    vid.src = URL.createObjectURL(file);
+
+    if (objectUrls[id]) URL.revokeObjectURL(objectUrls[id]);
+    objectUrls[id] = URL.createObjectURL(file);
+    vid.src = objectUrls[id];
+    vid.load();
 
     document.getElementById('zone-' + id).classList.add('hidden');
     document.getElementById('label-' + id).style.display = 'block';
@@ -489,18 +577,8 @@
     if (id === 'a') hasA = true; else hasB = true;
 
     vid.addEventListener('loadedmetadata', () => {
-      if (id === 'a') timeDur.textContent = fmt(vA.duration);
+      updateTimeUi();
     }, { once: true });
-
-    vid.addEventListener('ended', () => {
-      // show play icon only if both ended (or other not loaded)
-      const aOk = !hasA || vA.ended || vA.paused;
-      const bOk = !hasB || vB.ended || vB.paused;
-      if (aOk && bOk) {
-        playIcon.style.display = 'block';
-        pauseIcon.style.display = 'none';
-      }
-    });
   }
 
   async function togglePlay() {
@@ -509,17 +587,16 @@
     if (isPlaying) {
       if (hasA) vA.pause();
       if (hasB) vB.pause();
-      playIcon.style.display = 'block';
-      pauseIcon.style.display = 'none';
+      stopRuntimeLoops();
+      refreshPlayUi();
       return;
     }
 
     // Sync B to A before playing
     if (hasA && hasB && syncEnabled) {
-      vB.currentTime = vA.currentTime;
+      syncSlaveToMaster(true);
     }
 
-    // Wait for both to be seeked/ready, then play together
     const plays = [];
     if (hasA) plays.push(vA.play());
     if (hasB) plays.push(vB.play());
@@ -528,8 +605,8 @@
       await Promise.all(plays);
     } catch(e) { /* autoplay blocked etc */ }
 
-    playIcon.style.display = 'none';
-    pauseIcon.style.display = 'block';
+    startRuntimeLoops();
+    refreshPlayUi();
   }
 
   function onScrub(val) {
@@ -537,38 +614,73 @@
     const pct = val / 1000;
     if (hasA && vA.duration) vA.currentTime = vA.duration * pct;
     if (hasB && syncEnabled && vB.duration) vB.currentTime = vB.duration * pct;
-    const pctDisplay = pct * 100;
-    scrubber.style.background = `linear-gradient(to right,#e8ff47 ${pctDisplay}%,#222230 ${pctDisplay}%)`;
-    timeCur.textContent = fmt(hasA ? vA.currentTime : 0);
+    if (!hasA && hasB && vB.duration) vB.currentTime = vB.duration * pct;
+    paintScrubber(pct);
+    const master = getMasterVideo();
+    timeCur.textContent = fmt(master ? master.currentTime : 0);
     clearTimeout(onScrub._t);
-    onScrub._t = setTimeout(() => { isScrubbing = false; }, 200);
+    onScrub._t = setTimeout(() => {
+      isScrubbing = false;
+      if (syncEnabled) syncSlaveToMaster(true);
+      updateTimeUi();
+    }, 120);
   }
 
   function seekStep(secs) {
     if (hasA) vA.currentTime = Math.max(0, Math.min(vA.duration || 0, vA.currentTime + secs));
-    if (hasB && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
+    if (!hasA && hasB) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vB.currentTime + secs));
+    if (hasB && hasA && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
+    if (syncEnabled) syncSlaveToMaster(true);
+    updateTimeUi();
   }
 
   function seekFrame(dir) {
     if (hasA) vA.pause();
     if (hasB) vB.pause();
-    playIcon.style.display = 'block';
-    pauseIcon.style.display = 'none';
+    stopRuntimeLoops();
+    refreshPlayUi();
     if (hasA) vA.currentTime = Math.max(0, Math.min(vA.duration || 0, vA.currentTime + dir * FRAME));
-    if (hasB && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
+    if (!hasA && hasB) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vB.currentTime + dir * FRAME));
+    if (hasB && hasA && syncEnabled) vB.currentTime = Math.max(0, Math.min(vB.duration || 0, vA.currentTime));
+    if (syncEnabled) syncSlaveToMaster(true);
+    updateTimeUi();
   }
 
   function setSpeed(val) {
     const s = parseFloat(val);
     if (hasA) vA.playbackRate = s;
     if (hasB) vB.playbackRate = s;
+    if (syncEnabled) syncSlaveToMaster(true);
   }
 
   function toggleSync() {
     syncEnabled = !syncEnabled;
     document.getElementById('sync-toggle').classList.toggle('on', syncEnabled);
-    if (syncEnabled && hasA && hasB) vB.currentTime = vA.currentTime;
+    if (syncEnabled) {
+      syncSlaveToMaster(true);
+      startSyncLoop();
+    } else {
+      stopSyncLoop();
+    }
   }
+
+  [vA, vB].forEach(v => {
+    v.addEventListener('play', () => {
+      startRuntimeLoops();
+      refreshPlayUi();
+    });
+
+    v.addEventListener('pause', () => {
+      if (bothPaused()) stopRuntimeLoops();
+      refreshPlayUi();
+    });
+
+    v.addEventListener('ended', () => {
+      if (bothPaused()) stopRuntimeLoops();
+      refreshPlayUi();
+      updateTimeUi();
+    });
+  });
 
   // Keyboard
   document.addEventListener('keydown', e => {
@@ -577,6 +689,11 @@
     if (e.code === 'ArrowRight') { e.preventDefault(); seekFrame(1); }
     if (e.code === 'KeyJ') seekStep(-10);
     if (e.code === 'KeyL') seekStep(10);
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (objectUrls.a) URL.revokeObjectURL(objectUrls.a);
+    if (objectUrls.b) URL.revokeObjectURL(objectUrls.b);
   });
 </script>
 
